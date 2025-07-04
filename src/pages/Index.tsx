@@ -27,10 +27,11 @@ const Index = () => {
     setImages([]);
 
     try {
-      const response = await fetch('/api/generate-image', {
+      const response = await fetch('https://bezmxockiownontvryzy.supabase.co/functions/v1/generate-image', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlem14b2NraW93bm9udHZyeXp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1NTUzMTgsImV4cCI6MjA2NzEzMTMxOH0.LXJ2FeZjfOgdBrGErgzWgZdb6Md2WZL3XA4gyiFp8lA`,
         },
         body: JSON.stringify({
           prompt,
