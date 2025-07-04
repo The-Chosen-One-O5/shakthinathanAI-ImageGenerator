@@ -9,7 +9,7 @@ import { Sparkles, Zap, Image, Download, Copy, Check } from "lucide-react";
 
 const Index = () => {
   const [prompt, setPrompt] = useState('');
-  const [model, setModel] = useState('flux-schnell');
+  const [model, setModel] = useState('img3');
   const [aspectRatio, setAspectRatio] = useState('1:1');
   const [numImages, setNumImages] = useState(1);
   const [images, setImages] = useState<string[]>([]);
@@ -181,9 +181,8 @@ const Index = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="flux-schnell">FLUX Schnell (⚡ Fast)</SelectItem>
-                      <SelectItem value="flux-dev">FLUX Dev (🎨 Quality)</SelectItem>
-                      <SelectItem value="dalle-3">DALL-E 3 (🔬 Precision)</SelectItem>
+                      <SelectItem value="img3">IMG3 (🚀 Advanced)</SelectItem>
+                      <SelectItem value="img4">IMG4 (💎 Premium)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
