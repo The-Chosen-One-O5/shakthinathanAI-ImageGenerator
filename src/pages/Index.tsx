@@ -10,7 +10,7 @@ import { Sparkles, Zap, Image, Download, Copy, Check } from "lucide-react";
 const Index = () => {
   const [prompt, setPrompt] = useState('');
   const [model, setModel] = useState('img3');
-  const [aspectRatio, setAspectRatio] = useState('1:1');
+  const [aspectRatio, setAspectRatio] = useState('square');
   const [numImages, setNumImages] = useState(1);
   const [images, setImages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -31,17 +31,24 @@ const Index = () => {
     setImages([]);
 
     try {
-      const response = await fetch('https://bezmxockiownontvryzy.supabase.co/functions/v1/generate-image', {
+      const aspectSize: Record<string, string> = {
+        square: '1024x1024',
+        landscape: '1792x1024',
+        portrait: '1024x1792',
+      }
+
+      const response = await fetch('https://api.infip.io/v1/images/generations', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJlem14b2NraW93bm9udHZyeXp5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTE1NTUzMTgsImV4cCI6MjA2NzEzMTMxOH0.LXJ2FeZjfOgdBrGErgzWgZdb6Md2WZL3XA4gyiFp8lA`,
+          'Authorization': 'Bearer infip-c9fb6147',
         },
         body: JSON.stringify({
-          prompt,
           model,
-          aspectRatio,
-          numImages,
+          prompt,
+          n: numImages,
+          size: aspectSize[aspectRatio] || '1024x1024',
+          response_format: 'b64_json',
         }),
       });
 
@@ -50,12 +57,13 @@ const Index = () => {
       }
 
       const data = await response.json();
-      
-      if (data.images) {
-        setImages(data.images);
+
+      if (data.data && Array.isArray(data.data)) {
+        const imgs = data.data.map((img: { b64_json: string }) => `data:image/png;base64,${img.b64_json}`);
+        setImages(imgs);
         toast({
           title: "Success",
-          description: `Generated ${data.images.length} image(s)`,
+          description: `Generated ${imgs.length} image(s)`,
         });
       }
     } catch (error) {
@@ -198,10 +206,9 @@ const Index = () => {
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="1:1">Square</SelectItem>
-                        <SelectItem value="16:9">Landscape</SelectItem>
-                        <SelectItem value="9:16">Portrait</SelectItem>
-                        <SelectItem value="4:3">Classic</SelectItem>
+                        <SelectItem value="square">Square</SelectItem>
+                        <SelectItem value="landscape">Landscape</SelectItem>
+                        <SelectItem value="portrait">Portrait</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
