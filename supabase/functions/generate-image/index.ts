@@ -44,19 +44,19 @@ serve(async (req) => {
     // Generate the requested number of images
     for (let i = 0; i < (numImages || 1); i++) {
       try {
-        const response = await fetch('https://api.infip.io/v1/image/generate', {
+        const response = await fetch('https://api.infip.io/v1/images/generations', {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${INFIP_API_KEY}`,
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
+            model: model || 'img3',
             prompt: prompt,
-            model: model || 'flux-schnell',
-            aspectRatio: aspectRatio || '1:1',
-            outputFormat: 'png',
-            outputQuality: 80,
-            numOutputs: 1
+            n: 1,
+            size: aspectRatio === 'landscape' ? '1792x1024' : 
+                  aspectRatio === 'portrait' ? '1024x1792' : '1024x1024',
+            response_format: 'b64_json'
           }),
         })
 
@@ -68,9 +68,9 @@ serve(async (req) => {
 
         const data = await response.json()
         
-        if (data.images && data.images.length > 0) {
-          // Infip returns base64 encoded images
-          images.push(`data:image/png;base64,${data.images[0]}`)
+        if (data.data && data.data.length > 0) {
+          // Infip returns b64_json format
+          images.push(`data:image/png;base64,${data.data[0].b64_json}`)
           console.log(`Generated image ${i + 1}/${numImages || 1}`)
         } else {
           console.error('No image data received from Infip API')
