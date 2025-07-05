@@ -58,7 +58,7 @@ serve(async (req) => {
 
     // Determine the Runware model based on user selection
     let runwareModel = "runware:100@1" // Default FLUX Schnell
-    if (model === "flux-dev") {
+    if (model === "img4") {
       runwareModel = "runware:101@1" // FLUX Dev
     }
 
