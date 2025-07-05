@@ -24,7 +24,7 @@ serve(async (req) => {
       )
     }
 
-    const INFIP_API_KEY = Deno.env.get('INFIP_API_KEY')
+    const INFIP_API_KEY = Deno.env.get('INFIP_API_KEY') || Deno.env.get('infip_api_key')
     if (!INFIP_API_KEY) {
       console.error('INFIP_API_KEY not found in environment variables')
       return new Response(
