@@ -1,4 +1,6 @@
 Hello
-This is Shakthinathan AI Image generator
+This is Shakthinathan AI Image generator.
 
-To use the Infip image generation API, set `INFIP_API_KEY` in `supabase/.env`.
+The project now uses the Infip API exclusively for image generation.
+Set your Infip API key in `supabase/.env` using the `INFIP_API_KEY` variable.
+
