@@ -1,4 +1,5 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
+import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -24,11 +25,11 @@ serve(async (req) => {
       )
     }
 
-    const RUNWARE_API_KEY = Deno.env.get('RUNWARE_API_KEY')
-    if (!RUNWARE_API_KEY) {
-      console.error('RUNWARE_API_KEY not found in environment variables')
+    const HUGGING_FACE_ACCESS_TOKEN = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN')
+    if (!HUGGING_FACE_ACCESS_TOKEN) {
+      console.error('HUGGING_FACE_ACCESS_TOKEN not found in environment variables')
       return new Response(
-        JSON.stringify({ error: 'API key not configured' }),
+        JSON.stringify({ error: 'Hugging Face API key not configured' }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -36,104 +37,37 @@ serve(async (req) => {
       )
     }
 
-    // Convert aspect ratio to width/height
-    let width = 1024, height = 1024
-    switch (aspectRatio) {
-      case '16:9':
-        width = 1024
-        height = 576
-        break
-      case '9:16':
-        width = 576
-        height = 1024
-        break
-      case '4:3':
-        width = 1024
-        height = 768
-        break
-      default:
-        width = 1024
-        height = 1024
-    }
+    const hf = new HfInference(HUGGING_FACE_ACCESS_TOKEN)
 
-    // Determine the Runware model based on user selection
-    let runwareModel = "runware:100@1" // Default FLUX Schnell
-    if (model === "img4") {
-      runwareModel = "runware:101@1" // FLUX Dev
-    }
-
+    // Choose model based on user selection
+    const modelName = model === "img4" ? 'black-forest-labs/FLUX.1-dev' : 'black-forest-labs/FLUX.1-schnell'
+    
     console.log(`Generating ${numImages} image(s) with prompt: "${prompt}"`)
-    console.log(`Using model: ${runwareModel}, dimensions: ${width}x${height}`)
+    console.log(`Using model: ${modelName}`)
 
-    // Prepare the request for Runware API
-    const requestBody = [
-      {
-        taskType: "authentication",
-        apiKey: RUNWARE_API_KEY
-      },
-      {
-        taskType: "imageInference",
-        taskUUID: crypto.randomUUID(),
-        positivePrompt: prompt,
-        width: width,
-        height: height,
-        model: runwareModel,
-        numberResults: numImages,
-        outputFormat: "WEBP",
-        CFGScale: 1,
-        scheduler: "FlowMatchEulerDiscreteScheduler",
-        strength: 0.8,
-        steps: 4
+    const images = []
+    
+    // Generate the requested number of images
+    for (let i = 0; i < numImages; i++) {
+      try {
+        const image = await hf.textToImage({
+          inputs: prompt,
+          model: modelName,
+        })
+
+        // Convert the blob to a base64 string
+        const arrayBuffer = await image.arrayBuffer()
+        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
+        images.push(`data:image/png;base64,${base64}`)
+        
+        console.log(`Generated image ${i + 1}/${numImages}`)
+      } catch (error) {
+        console.error(`Error generating image ${i + 1}:`, error)
+        // Continue with other images if one fails
       }
-    ]
-
-    console.log('Sending request to Runware API:', JSON.stringify(requestBody, null, 2))
-
-    const response = await fetch('https://api.runware.ai/v1', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(requestBody)
-    })
-
-    if (!response.ok) {
-      const errorText = await response.text()
-      console.error('Runware API error:', response.status, errorText)
-      return new Response(
-        JSON.stringify({ 
-          error: `API request failed: ${response.status}`,
-          details: errorText
-        }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
     }
-
-    const data = await response.json()
-    console.log('Runware API response:', JSON.stringify(data, null, 2))
-
-    if (data.error || data.errors) {
-      const errorMessage = data.errorMessage || data.errors?.[0]?.message || 'Unknown error from API'
-      console.error('Runware API error response:', errorMessage)
-      return new Response(
-        JSON.stringify({ error: errorMessage }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
-    // Extract image URLs from the response
-    const images = data.data
-      ?.filter((item: any) => item.taskType === 'imageInference' && item.imageURL)
-      ?.map((item: any) => item.imageURL) || []
 
     if (images.length === 0) {
-      console.error('No images generated in response:', data)
       return new Response(
         JSON.stringify({ error: 'No images were generated' }),
         { 
