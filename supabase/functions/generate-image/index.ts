@@ -1,5 +1,4 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
-import { HfInference } from 'https://esm.sh/@huggingface/inference@2.3.2'
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,11 +24,11 @@ serve(async (req) => {
       )
     }
 
-    const HUGGING_FACE_ACCESS_TOKEN = Deno.env.get('HUGGING_FACE_ACCESS_TOKEN')
-    if (!HUGGING_FACE_ACCESS_TOKEN) {
-      console.error('HUGGING_FACE_ACCESS_TOKEN not found in environment variables')
+    const INFIP_API_KEY = Deno.env.get('INFIP_API_KEY')
+    if (!INFIP_API_KEY) {
+      console.error('INFIP_API_KEY not found in environment variables')
       return new Response(
-        JSON.stringify({ error: 'Hugging Face API key not configured' }),
+        JSON.stringify({ error: 'Infip API key not configured' }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
@@ -37,30 +36,45 @@ serve(async (req) => {
       )
     }
 
-    const hf = new HfInference(HUGGING_FACE_ACCESS_TOKEN)
-
-    // Choose model based on user selection
-    const modelName = model === "img4" ? 'black-forest-labs/FLUX.1-dev' : 'black-forest-labs/FLUX.1-schnell'
-    
-    console.log(`Generating ${numImages} image(s) with prompt: "${prompt}"`)
-    console.log(`Using model: ${modelName}`)
+    console.log(`Generating ${numImages || 1} image(s) with prompt: "${prompt}"`)
+    console.log(`Using model: ${model || 'default'}`)
 
     const images = []
     
     // Generate the requested number of images
-    for (let i = 0; i < numImages; i++) {
+    for (let i = 0; i < (numImages || 1); i++) {
       try {
-        const image = await hf.textToImage({
-          inputs: prompt,
-          model: modelName,
+        const response = await fetch('https://api.infip.io/v1/image/generate', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${INFIP_API_KEY}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            prompt: prompt,
+            model: model || 'flux-schnell',
+            aspectRatio: aspectRatio || '1:1',
+            outputFormat: 'png',
+            outputQuality: 80,
+            numOutputs: 1
+          }),
         })
 
-        // Convert the blob to a base64 string
-        const arrayBuffer = await image.arrayBuffer()
-        const base64 = btoa(String.fromCharCode(...new Uint8Array(arrayBuffer)))
-        images.push(`data:image/png;base64,${base64}`)
+        if (!response.ok) {
+          const errorText = await response.text()
+          console.error(`Infip API error: ${response.status} - ${errorText}`)
+          throw new Error(`Infip API error: ${response.status}`)
+        }
+
+        const data = await response.json()
         
-        console.log(`Generated image ${i + 1}/${numImages}`)
+        if (data.images && data.images.length > 0) {
+          // Infip returns base64 encoded images
+          images.push(`data:image/png;base64,${data.images[0]}`)
+          console.log(`Generated image ${i + 1}/${numImages || 1}`)
+        } else {
+          console.error('No image data received from Infip API')
+        }
       } catch (error) {
         console.error(`Error generating image ${i + 1}:`, error)
         // Continue with other images if one fails
