@@ -5,6 +5,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 }
 
+function getImageSize(aspectRatio: string): string {
+  switch (aspectRatio) {
+    case '1:1':
+      return '1024x1024'
+    case '16:9':
+      return '1792x1024'
+    case '9:16':
+      return '1024x1792'
+    case '4:3':
+      return '1024x768'
+    case 'landscape':
+      return '1792x1024'
+    case 'portrait':
+      return '1024x1792'
+    case 'square':
+      return '1024x1024'
+    default:
+      return '1024x1024'
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -54,8 +75,7 @@ serve(async (req) => {
             model: model || 'img3',
             prompt: prompt,
             n: 1,
-            size: aspectRatio === 'landscape' ? '1792x1024' : 
-                  aspectRatio === 'portrait' ? '1024x1792' : '1024x1024',
+            size: getImageSize(aspectRatio),
             response_format: 'b64_json'
           }),
         })
