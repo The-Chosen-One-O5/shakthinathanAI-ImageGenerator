@@ -59,116 +59,66 @@ serve(async (req) => {
 
     console.log(`Generating ${numImages || 1} image(s) with prompt: "${prompt}"`)
     console.log(`Using model: ${model || 'img3'}`)
-    console.log(`API Key format: ${INFIP_API_KEY.substring(0, 10)}...`)
 
-    const images = []
-    
-    // Generate the requested number of images
-    for (let i = 0; i < (numImages || 1); i++) {
-      try {
-        console.log(`Attempting to generate image ${i + 1} with size: ${getImageSize(aspectRatio)}`)
-        
-        // Try different authentication methods
-        const requestBody = {
-          model: model || 'img3',
-          prompt: prompt,
-          n: 1,
-          size: getImageSize(aspectRatio),
-          response_format: 'b64_json'
-        }
-        
-        console.log('Request body:', JSON.stringify(requestBody, null, 2))
-        
-        // First try with Bearer token
-        let response = await fetch('https://api.infip.io/v1/images/generations', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${INFIP_API_KEY}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify(requestBody),
-        })
-
-        // If Bearer fails, try with different auth methods
-        if (!response.ok) {
-          console.log(`Bearer auth failed (${response.status}), trying direct API key...`)
-          
-          response = await fetch('https://api.infip.io/v1/images/generations', {
-            method: 'POST',
-            headers: {
-              'Authorization': INFIP_API_KEY,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody),
-          })
-        }
-
-        if (!response.ok) {
-          console.log(`Direct auth failed (${response.status}), trying X-API-Key header...`)
-          
-          response = await fetch('https://api.infip.io/v1/images/generations', {
-            method: 'POST',
-            headers: {
-              'X-API-Key': INFIP_API_KEY,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify(requestBody),
-          })
-        }
-
-        if (!response.ok) {
-          const errorText = await response.text()
-          console.error(`Infip API error (${response.status}):`, errorText)
-          console.error('Response headers:', Object.fromEntries(response.headers.entries()))
-          throw new Error(`Infip API error: ${response.status} - ${errorText}`)
-        }
-
-        const data = await response.json()
-        console.log('API Response structure:', Object.keys(data))
-        
-        if (data.data && data.data.length > 0) {
-          // Infip returns b64_json format
-          const imageData = data.data[0]
-          console.log('Image data keys:', Object.keys(imageData))
-          
-          if (imageData.b64_json) {
-            images.push(`data:image/png;base64,${imageData.b64_json}`)
-            console.log(`Successfully generated image ${i + 1}/${numImages || 1}`)
-          } else if (imageData.url) {
-            // Some APIs return URL instead of base64
-            images.push(imageData.url)
-            console.log(`Successfully generated image ${i + 1}/${numImages || 1} (URL format)`)
-          } else {
-            console.error('No b64_json or url field in image data:', imageData)
-          }
-        } else {
-          console.error('No image data received from Infip API. Full response:', data)
-        }
-      } catch (error) {
-        console.error(`Error generating image ${i + 1}:`, error.message)
-        console.error('Error stack:', error.stack)
-        // Continue with other images if one fails
-      }
+    const requestBody = {
+      model: model || 'img3',
+      prompt: prompt,
+      num_images: numImages || 1,
+      size: getImageSize(aspectRatio)
     }
+    
+    console.log('Request body:', JSON.stringify(requestBody, null, 2))
 
-    if (images.length === 0) {
+    try {
+      const response = await fetch('https://api.infip.pro/v1/images/generations', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${INFIP_API_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      })
+
+      if (!response.ok) {
+        const errorText = await response.text()
+        console.error(`Infip API error (${response.status}):`, errorText)
+        throw new Error(`Infip API error: ${response.status} - ${errorText}`)
+      }
+
+      const data = await response.json()
+      console.log('API Response:', data)
+      
+      if (data.images && data.images.length > 0) {
+        console.log(`Successfully generated ${data.images.length} image(s)`)
+        return new Response(
+          JSON.stringify({ images: data.images }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        )
+      } else {
+        console.error('No images in response:', data)
+        return new Response(
+          JSON.stringify({ error: 'No images were generated' }),
+          { 
+            status: 500, 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        )
+      }
+    } catch (error) {
+      console.error('Error generating images:', error.message)
       return new Response(
-        JSON.stringify({ error: 'No images were generated' }),
+        JSON.stringify({ 
+          error: 'Failed to generate images',
+          details: error.message 
+        }),
         { 
           status: 500, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
         }
       )
     }
-
-    console.log(`Successfully generated ${images.length} image(s)`)
-
-    return new Response(
-      JSON.stringify({ images }),
-      { 
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-      }
-    )
 
   } catch (error) {
     console.error('Error in generate-image function:', error)
