@@ -88,10 +88,11 @@ serve(async (req) => {
       const data = await response.json()
       console.log('API Response:', data)
       
-      if (data.images && data.images.length > 0) {
-        console.log(`Successfully generated ${data.images.length} image(s)`)
+      if (data.data && data.data.length > 0) {
+        const images = data.data.map((item: any) => item.url)
+        console.log(`Successfully generated ${images.length} image(s)`)
         return new Response(
-          JSON.stringify({ images: data.images }),
+          JSON.stringify({ images: images }),
           { 
             headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
           }
