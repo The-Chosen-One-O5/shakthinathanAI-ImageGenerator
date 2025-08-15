@@ -181,8 +181,12 @@ const Index = () => {
                       <SelectValue />
                     </SelectTrigger>
                     <SelectContent>
-                      <SelectItem value="img3">IMG3 (🚀 Advanced)</SelectItem>
-                      <SelectItem value="img4">IMG4 (💎 Premium)</SelectItem>
+                      <SelectItem value="img3">IMG3 (🚀 Infip Advanced)</SelectItem>
+                      <SelectItem value="img4">IMG4 (💎 Infip Premium)</SelectItem>
+                      <SelectItem value="black-forest-labs/FLUX.1-kontext-max">FLUX Kontext Max (⚡ TypeGPT)</SelectItem>
+                      <SelectItem value="black-forest-labs/FLUX.1-kontext-pro">FLUX Kontext Pro (🔥 TypeGPT)</SelectItem>
+                      <SelectItem value="provider4-gemini-2.0-flash-exp-image-generation">Gemini 2.0 Flash (✨ SamuraiAPI)</SelectItem>
+                      <SelectItem value="qwen-image">Qwen Image (🎯 SamuraiAPI)</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>

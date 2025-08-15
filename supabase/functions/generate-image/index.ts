@@ -26,6 +26,46 @@ function getImageSize(aspectRatio: string): string {
   }
 }
 
+interface Provider {
+  name: string;
+  apiKey: string | null;
+  baseUrl: string;
+  models: string[];
+  formatRequest: (prompt: string, model: string, numImages: number, size: string) => any;
+  parseResponse: (data: any) => string[];
+}
+
+async function tryProvider(provider: Provider, prompt: string, model: string, numImages: number, size: string): Promise<string[]> {
+  if (!provider.apiKey) {
+    throw new Error(`${provider.name} API key not configured`);
+  }
+
+  console.log(`Trying ${provider.name} with model: ${model}`);
+  
+  const requestBody = provider.formatRequest(prompt, model, numImages, size);
+  console.log(`${provider.name} request:`, JSON.stringify(requestBody, null, 2));
+
+  const response = await fetch(provider.baseUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${provider.apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(requestBody),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text();
+    console.error(`${provider.name} API error (${response.status}):`, errorText);
+    throw new Error(`${provider.name} API error: ${response.status} - ${errorText}`);
+  }
+
+  const data = await response.json();
+  console.log(`${provider.name} response:`, data);
+  
+  return provider.parseResponse(data);
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -45,81 +85,117 @@ serve(async (req) => {
       )
     }
 
-    const INFIP_API_KEY = Deno.env.get('INFIP_API_KEY')
-    if (!INFIP_API_KEY) {
-      console.error('INFIP_API_KEY not found in environment variables')
-      return new Response(
-        JSON.stringify({ error: 'Infip API key not configured' }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-        }
-      )
-    }
-
     console.log(`Generating ${numImages || 1} image(s) with prompt: "${prompt}"`)
     console.log(`Using model: ${model || 'img3'}`)
 
-    const requestBody = {
-      model: model || 'img3',
-      prompt: prompt,
-      num_images: numImages || 1,
-      size: getImageSize(aspectRatio)
-    }
-    
-    console.log('Request body:', JSON.stringify(requestBody, null, 2))
+    const size = getImageSize(aspectRatio)
+    const selectedModel = model || 'img3'
 
-    try {
-      const response = await fetch('https://api.infip.pro/v1/images/generations', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${INFIP_API_KEY}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(requestBody),
-      })
-
-      if (!response.ok) {
-        const errorText = await response.text()
-        console.error(`Infip API error (${response.status}):`, errorText)
-        throw new Error(`Infip API error: ${response.status} - ${errorText}`)
-      }
-
-      const data = await response.json()
-      console.log('API Response:', data)
-      
-      if (data.data && data.data.length > 0) {
-        const images = data.data.map((item: any) => item.url)
-        console.log(`Successfully generated ${images.length} image(s)`)
-        return new Response(
-          JSON.stringify({ images: images }),
-          { 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
-      } else {
-        console.error('No images in response:', data)
-        return new Response(
-          JSON.stringify({ error: 'No images were generated' }),
-          { 
-            status: 500, 
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
-          }
-        )
-      }
-    } catch (error) {
-      console.error('Error generating images:', error.message)
-      return new Response(
-        JSON.stringify({ 
-          error: 'Failed to generate images',
-          details: error.message 
+    // Define all providers with their configurations
+    const providers: Provider[] = [
+      {
+        name: 'Infip',
+        apiKey: Deno.env.get('INFIP_API_KEY'),
+        baseUrl: 'https://api.infip.pro/v1/images/generations',
+        models: ['img3', 'img4'],
+        formatRequest: (prompt, model, numImages, size) => ({
+          model,
+          prompt,
+          num_images: numImages,
+          size
         }),
-        { 
-          status: 500, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+        parseResponse: (data) => {
+          if (data.data && data.data.length > 0) {
+            return data.data.map((item: any) => item.url);
+          }
+          throw new Error('No images in response');
         }
-      )
+      },
+      {
+        name: 'TypeGPT',
+        apiKey: Deno.env.get('TYPEGPT_API_KEY'),
+        baseUrl: 'https://fast.typegpt.net/v1/images/generations',
+        models: ['black-forest-labs/FLUX.1-kontext-max', 'black-forest-labs/FLUX.1-kontext-pro'],
+        formatRequest: (prompt, model, numImages, size) => ({
+          model,
+          prompt,
+          n: numImages,
+          size
+        }),
+        parseResponse: (data) => {
+          if (data.data && data.data.length > 0) {
+            return data.data.map((item: any) => item.url);
+          }
+          throw new Error('No images in response');
+        }
+      },
+      {
+        name: 'SamuraiAPI',
+        apiKey: Deno.env.get('SAMURAIAPI_KEY'),
+        baseUrl: 'https://samuraiapi.in/v1/images/generations',
+        models: ['provider4-gemini-2.0-flash-exp-image-generation', 'qwen-image'],
+        formatRequest: (prompt, model, numImages, size) => ({
+          model,
+          prompt,
+          n: numImages,
+          size
+        }),
+        parseResponse: (data) => {
+          if (data.data && data.data.length > 0) {
+            return data.data.map((item: any) => item.url);
+          }
+          throw new Error('No images in response');
+        }
+      }
+    ];
+
+    // Find the provider that supports the selected model
+    let targetProvider = providers.find(p => p.models.includes(selectedModel));
+    
+    // If no provider found for the model, use Infip as default
+    if (!targetProvider) {
+      targetProvider = providers[0]; // Infip
+      console.log(`Model ${selectedModel} not found, defaulting to Infip with img3`);
     }
+
+    // Try the target provider first, then fallback to others
+    const providersToTry = [targetProvider, ...providers.filter(p => p !== targetProvider)];
+    
+    for (const provider of providersToTry) {
+      if (!provider.apiKey) {
+        console.log(`Skipping ${provider.name} - API key not configured`);
+        continue;
+      }
+
+      try {
+        // Use the model if supported by this provider, otherwise use first available model
+        const modelToUse = provider.models.includes(selectedModel) ? selectedModel : provider.models[0];
+        const images = await tryProvider(provider, prompt, modelToUse, numImages || 1, size);
+        
+        console.log(`Successfully generated ${images.length} image(s) using ${provider.name}`);
+        return new Response(
+          JSON.stringify({ images, provider: provider.name, model: modelToUse }),
+          { 
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+          }
+        );
+      } catch (error) {
+        console.error(`${provider.name} failed:`, error.message);
+        // Continue to next provider
+      }
+    }
+
+    // If all providers failed
+    return new Response(
+      JSON.stringify({ 
+        error: 'All image generation providers failed',
+        details: 'Please try again later'
+      }),
+      { 
+        status: 500, 
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' } 
+      }
+    )
 
   } catch (error) {
     console.error('Error in generate-image function:', error)
