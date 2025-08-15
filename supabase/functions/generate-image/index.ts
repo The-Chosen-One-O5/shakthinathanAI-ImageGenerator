@@ -115,7 +115,7 @@ serve(async (req) => {
         name: 'TypeGPT',
         apiKey: Deno.env.get('TYPEGPT_API_KEY'),
         baseUrl: 'https://fast.typegpt.net/v1/images/generations',
-        models: ['black-forest-labs/FLUX.1-kontext-max', 'black-forest-labs/FLUX.1-kontext-pro'],
+        models: ['black-forest-labs/FLUX.1-kontext-pro'],
         formatRequest: (prompt, model, numImages, size) => ({
           model,
           prompt,
@@ -133,7 +133,7 @@ serve(async (req) => {
         name: 'SamuraiAPI',
         apiKey: Deno.env.get('SAMURAIAPI_KEY'),
         baseUrl: 'https://samuraiapi.in/v1/images/generations',
-        models: ['provider4-gemini-2.0-flash-exp-image-generation', 'qwen-image'],
+        models: ['provider4-gemini-2.0-flash-exp-image-generation', 'qwen-image', 'TogetherImage/black-forest-labs/FLUX.1-kontext-max'],
         formatRequest: (prompt, model, numImages, size) => ({
           model,
           prompt,
