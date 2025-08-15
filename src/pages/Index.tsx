@@ -15,7 +15,10 @@ const Index = () => {
   const [images, setImages] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [copiedIndex, setCopiedIndex] = useState<number | null>(null);
+  const [sourceImage, setSourceImage] = useState<string | null>(null);
   const { toast } = useToast();
+
+  const isFluxModel = model.includes('FLUX') || model.includes('flux');
 
   const generateImages = async () => {
     if (!prompt.trim()) {
@@ -42,6 +45,7 @@ const Index = () => {
           model,
           aspectRatio,
           numImages,
+          image: sourceImage,
         }),
       });
 
@@ -153,6 +157,41 @@ const Index = () => {
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Source Image Input (for FLUX models) */}
+                {isFluxModel && (
+                  <div className="space-y-2">
+                    <label className="text-sm font-medium text-foreground">
+                      Source Image (Optional)
+                    </label>
+                    <Input
+                      type="file"
+                      accept="image/*"
+                      onChange={async (e) => {
+                        const file = e.target.files?.[0];
+                        if (file) {
+                          const reader = new FileReader();
+                          reader.onload = (e) => {
+                            setSourceImage(e.target?.result as string);
+                          };
+                          reader.readAsDataURL(file);
+                        }
+                      }}
+                      className="bg-muted/50 border-border/50 focus:border-primary/50 focus:ring-primary/25"
+                    />
+                    {sourceImage && (
+                      <div className="relative">
+                        <img src={sourceImage} alt="Source" className="w-full h-20 object-cover rounded" />
+                        <button
+                          onClick={() => setSourceImage(null)}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {/* Prompt Input */}
                 <div className="space-y-2">
                   <label className="text-sm font-medium text-foreground">

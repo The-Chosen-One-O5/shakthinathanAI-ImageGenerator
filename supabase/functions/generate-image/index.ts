@@ -31,18 +31,18 @@ interface Provider {
   apiKey: string | null;
   baseUrl: string;
   models: string[];
-  formatRequest: (prompt: string, model: string, numImages: number, size: string) => any;
+  formatRequest: (prompt: string, model: string, numImages: number, size: string, image?: string) => any;
   parseResponse: (data: any) => string[];
 }
 
-async function tryProvider(provider: Provider, prompt: string, model: string, numImages: number, size: string): Promise<string[]> {
+async function tryProvider(provider: Provider, prompt: string, model: string, numImages: number, size: string, image?: string): Promise<string[]> {
   if (!provider.apiKey) {
     throw new Error(`${provider.name} API key not configured`);
   }
 
   console.log(`Trying ${provider.name} with model: ${model}`);
   
-  const requestBody = provider.formatRequest(prompt, model, numImages, size);
+  const requestBody = provider.formatRequest(prompt, model, numImages, size, image);
   console.log(`${provider.name} request:`, JSON.stringify(requestBody, null, 2));
 
   const response = await fetch(provider.baseUrl, {
@@ -73,7 +73,7 @@ serve(async (req) => {
   }
 
   try {
-    const { prompt, model, aspectRatio, numImages } = await req.json()
+    const { prompt, model, aspectRatio, numImages, image } = await req.json()
     
     if (!prompt) {
       return new Response(
@@ -98,7 +98,7 @@ serve(async (req) => {
         apiKey: Deno.env.get('INFIP_API_KEY'),
         baseUrl: 'https://api.infip.pro/v1/images/generations',
         models: ['img3', 'img4'],
-        formatRequest: (prompt, model, numImages, size) => ({
+        formatRequest: (prompt, model, numImages, size, image) => ({
           model,
           prompt,
           num_images: numImages,
@@ -116,12 +116,21 @@ serve(async (req) => {
         apiKey: Deno.env.get('TYPEGPT_API_KEY'),
         baseUrl: 'https://fast.typegpt.net/v1/images/generations',
         models: ['black-forest-labs/FLUX.1-kontext-pro'],
-        formatRequest: (prompt, model, numImages, size) => ({
-          model,
-          prompt,
-          n: numImages,
-          size
-        }),
+        formatRequest: (prompt, model, numImages, size, image) => {
+          const request: any = {
+            model,
+            prompt,
+            n: numImages,
+            size
+          };
+          
+          // Add image-to-image support for FLUX models
+          if (image && (model.includes('FLUX') || model.includes('flux'))) {
+            request.image = image;
+          }
+          
+          return request;
+        },
         parseResponse: (data) => {
           if (data.data && data.data.length > 0) {
             return data.data.map((item: any) => item.url);
@@ -134,12 +143,21 @@ serve(async (req) => {
         apiKey: Deno.env.get('SAMURAIAPI_KEY'),
         baseUrl: 'https://samuraiapi.in/v1/images/generations',
         models: ['provider4-gemini-2.0-flash-exp-image-generation', 'qwen-image', 'TogetherImage/black-forest-labs/FLUX.1-kontext-max'],
-        formatRequest: (prompt, model, numImages, size) => ({
-          model,
-          prompt,
-          n: numImages,
-          size
-        }),
+        formatRequest: (prompt, model, numImages, size, image) => {
+          const request: any = {
+            model,
+            prompt,
+            n: numImages,
+            size
+          };
+          
+          // Add image-to-image support for FLUX models
+          if (image && (model.includes('FLUX') || model.includes('flux'))) {
+            request.image = image;
+          }
+          
+          return request;
+        },
         parseResponse: (data) => {
           if (data.data && data.data.length > 0) {
             return data.data.map((item: any) => item.url);
@@ -170,7 +188,7 @@ serve(async (req) => {
       try {
         // Use the model if supported by this provider, otherwise use first available model
         const modelToUse = provider.models.includes(selectedModel) ? selectedModel : provider.models[0];
-        const images = await tryProvider(provider, prompt, modelToUse, numImages || 1, size);
+        const images = await tryProvider(provider, prompt, modelToUse, numImages || 1, size, image);
         
         console.log(`Successfully generated ${images.length} image(s) using ${provider.name}`);
         return new Response(
